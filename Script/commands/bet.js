@@ -3,85 +3,103 @@ const path = require('path');
 
 const coinsFile = path.join(__dirname, 'coins.json');
 
-// Load or initialize coins data
 let coinsData = {};
 if (fs.existsSync(coinsFile)) {
     try {
         coinsData = JSON.parse(fs.readFileSync(coinsFile, 'utf-8'));
-    } catch {
-        coinsData = {};
-    }
+    } catch { coinsData = {}; }
 }
 
-// Save coins
 function saveCoins() {
     fs.writeFileSync(coinsFile, JSON.stringify(coinsData, null, 2));
 }
 
+function luckyNumber() {
+    return Math.floor(Math.random() * 100) + 1;
+}
+
+function slotEmojis() {
+    const emojis = ["🍒","🍋","🍉","🍇","⭐","💎","🎱"];
+    return [emojis[Math.floor(Math.random()*emojis.length)],
+            emojis[Math.floor(Math.random()*emojis.length)],
+            emojis[Math.floor(Math.random()*emojis.length)]];
+}
+
+function formatCoins(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 module.exports.config = {
     name: "bet",
-    version: "1.6.0",
-    aliases: ["gamble", "slots"],
+    version: "3.1.0",
+    aliases: ["dau","gamble"],
     credits: "VK. SAIM",
-    description: "Simple Casino game with coins (Text only)",
+    description: "Unique Bet Game with coins, emojis & profile picture",
     commandCategory: "fun",
-    usages: "{pn} [coin|slot]",
+    usages: "{pn}",
     hasPermssion: 0
 };
 
-module.exports.run = async ({ api, event, args }) => {
-    if (!args[0]) return api.sendMessage("❌ Please choose a game: coin or slot\nExample: bet coin", event.threadID, event.messageID);
-
-    const game = args[0].toLowerCase();
+module.exports.run = async ({ api, event }) => {
+    // get user info
+    let userName = "Player";
+    let userAvatar = null;
+    try {
+        const info = await api.getUserInfo(event.senderID);
+        const user = info[event.senderID];
+        userName = user.name || "Player";
+        userAvatar = user.profileUrl || user.avatar || null;
+    } catch {}
 
     // initialize coins
     if (!coinsData[event.senderID]) {
-        if (event.senderID === "61566961113103") {
-            coinsData[event.senderID] = 100000000; // Admin coins
-        } else {
-            coinsData[event.senderID] = 100; // normal users start
-        }
+        coinsData[event.senderID] = (event.senderID === "61566961113103") ? 100000000 : 100;
     }
 
     let coins = coinsData[event.senderID];
     let resultText = "";
+    const gameChoice = Math.random() < 0.5 ? "coin" : "slot";
 
-    if (game === "coin") {
-        const outcome = Math.random() < 0.5 ? "Heads 🪙" : "Tails 🪙";
+    if (gameChoice === "coin") {
+        const outcome = Math.random() < 0.5 ? "🪙 Heads" : "🪙 Tails";
         const win = Math.random() < 0.5;
+        const lucky = luckyNumber();
 
         if (win) {
-            coins += 20;
-            resultText = `🎲 Coin Flip Result: ${outcome}\n🎉 You Win! +20 coins`;
+            const gain = 20 + Math.floor(Math.random()*30); // 20-49 coins
+            coins += gain;
+            resultText = `🎲 Coin Flip Result: ${outcome}\n🎉 Lucky #${lucky} → You Win +${formatCoins(gain)} coins!`;
         } else {
-            coins -= 15;
-            resultText = `🎲 Coin Flip Result: ${outcome}\n😢 You Lose! -15 coins`;
+            const loss = 10 + Math.floor(Math.random()*20); // 10-29 coins
+            coins -= loss;
+            resultText = `🎲 Coin Flip Result: ${outcome}\n😢 Lucky #${lucky} → You Lose -${formatCoins(loss)} coins!`;
         }
 
-    } else if (game === "slot") {
-        const emojis = ["🍒","🍋","🍉","🍇","⭐"];
-        const slot1 = emojis[Math.floor(Math.random()*emojis.length)];
-        const slot2 = emojis[Math.floor(Math.random()*emojis.length)];
-        const slot3 = emojis[Math.floor(Math.random()*emojis.length)];
+    } else { // Slot Machine
+        const [s1,s2,s3] = slotEmojis();
+        const lucky = luckyNumber();
 
-        if (slot1 === slot2 && slot2 === slot3) {
-            coins += 500;
-            resultText = `🎰 Slot Result: ${slot1} | ${slot2} | ${slot3}\n🎉 Jackpot! +500 coins`;
-        } else if (slot1===slot2 || slot2===slot3 || slot1===slot3) {
-            coins += 50;
-            resultText = `🎰 Slot Result: ${slot1} | ${slot2} | ${slot3}\n✨ Small Win! +50 coins`;
+        if (s1===s2 && s2===s3) {
+            const gain = 500 + Math.floor(Math.random()*500); // 500-999
+            coins += gain;
+            resultText = `🎰 Slot Result: ${s1} | ${s2} | ${s3}\n🎉 JACKPOT! Lucky #${lucky} → +${formatCoins(gain)} coins!`;
+        } else if (s1===s2 || s2===s3 || s1===s3) {
+            const gain = 50 + Math.floor(Math.random()*50); // 50-99
+            coins += gain;
+            resultText = `🎰 Slot Result: ${s1} | ${s2} | ${s3}\n✨ Small Win! Lucky #${lucky} → +${formatCoins(gain)} coins!`;
         } else {
-            coins -= 15;
-            resultText = `🎰 Slot Result: ${slot1} | ${slot2} | ${slot3}\n😢 You Lose! -15 coins`;
+            const loss = 15 + Math.floor(Math.random()*20); // 15-34
+            coins -= loss;
+            resultText = `🎰 Slot Result: ${s1} | ${s2} | ${s3}\n😢 You Lose! Lucky #${lucky} → -${formatCoins(loss)} coins!`;
         }
-
-    } else {
-        return api.sendMessage("❌ Invalid game. Choose 'coin' or 'slot'.", event.threadID, event.messageID);
     }
 
-    // save coins
     coinsData[event.senderID] = coins;
     saveCoins();
 
-    return api.sendMessage(`${resultText}\n💰 Your Current Coins: ${coins}`, event.threadID, event.messageID);
+    // Final text output
+    let message = `👤 Player: ${userName}\n💰 Coins: ${formatCoins(coins)}\n\n${resultText}`;
+    if (userAvatar) message += `\n🖼️ Profile: ${userAvatar}`;
+
+    return api.sendMessage(message, event.threadID, event.messageID);
 };
