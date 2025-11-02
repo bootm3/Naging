@@ -1,5 +1,5 @@
 // ==========================================
-// Messenger Chatbot + Image-to-Video
+// Messenger Chatbot + Image-to-Video (Fixed)
 // File: animate.js
 // Author: VK. SAIM
 // ==========================================
@@ -37,9 +37,10 @@ app.get("/webhook", (req, res) => {
 // -------------------- Messenger webhook --------------------
 app.post("/webhook", async (req, res) => {
   const body = req.body;
+  console.log("Webhook event received:", JSON.stringify(body, null, 2));
 
   if (body.object === "page") {
-    body.entry.forEach(async (entry) => {
+    for (const entry of body.entry) {
       const webhookEvent = entry.messaging[0];
       const senderId = webhookEvent.sender.id;
 
@@ -89,10 +90,10 @@ app.post("/webhook", async (req, res) => {
           }
         }
       } catch (err) {
-        console.error("Error:", err.message);
+        console.error("Error handling message:", err.message);
         await sendText(senderId, "দুঃখিত, কিছু সমস্যা হয়েছে। আবার চেষ্টা করুন।");
       }
-    });
+    }
 
     res.status(200).send("EVENT_RECEIVED");
   } else {
@@ -104,40 +105,52 @@ app.post("/webhook", async (req, res) => {
 
 // Send text message
 async function sendText(senderId, text) {
-  await axios.post(
-    `https://graph.facebook.com/v15.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-    {
-      recipient: { id: senderId },
-      message: { text: text },
-    }
-  );
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v15.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      {
+        recipient: { id: senderId },
+        message: { text: text },
+      }
+    );
+  } catch (err) {
+    console.error("Error sending text:", err.response?.data || err.message);
+  }
 }
 
 // Send video message
 async function sendVideo(senderId, video_url) {
-  await axios.post(
-    `https://graph.facebook.com/v15.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-    {
-      recipient: { id: senderId },
-      message: {
-        attachment: {
-          type: "video",
-          payload: { url: video_url, is_reusable: true },
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v15.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      {
+        recipient: { id: senderId },
+        message: {
+          attachment: {
+            type: "video",
+            payload: { url: video_url, is_reusable: true },
+          },
         },
-      },
-    }
-  );
+      }
+    );
+  } catch (err) {
+    console.error("Error sending video:", err.response?.data || err.message);
+  }
 }
 
 // Send typing indicator
 async function sendTyping(senderId, on = true) {
-  await axios.post(
-    `https://graph.facebook.com/v15.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-    {
-      recipient: { id: senderId },
-      sender_action: on ? "typing_on" : "typing_off",
-    }
-  );
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v15.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      {
+        recipient: { id: senderId },
+        sender_action: on ? "typing_on" : "typing_off",
+      }
+    );
+  } catch (err) {
+    console.error("Error sending typing:", err.response?.data || err.message);
+  }
 }
 
 // Call Imagine API to create video
@@ -159,6 +172,7 @@ async function createVideo(image_url, prompt_text) {
       }
     );
 
+    console.log("Imagine API response:", response.data);
     return response.data.video_url;
   } catch (err) {
     console.error("Error creating video:", err.response?.data || err.message);
